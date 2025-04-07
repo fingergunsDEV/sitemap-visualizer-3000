@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <script src="https://cdn.jsdelivr.net/npm/svg-pan-zoom@3.6.0/dist/svg-pan-zoom.min.js"></script>
+
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Site Structure Generator</title>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap">
+  <script src="https://cdn.jsdelivr.net/npm/mermaid@10.6.1/dist/mermaid.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/svg-pan-zoom@3.6.0/dist/svg-pan-zoom.min.js"></script>
+  <script>
+    // Initialize Mermaid
+    mermaid.initialize({ startOnLoad: true });
+
+    // Function to generate Mermaid code from list of URLs
+    function generateMermaidCode() {
+      const urlListText = document.getElementById("urlListText").value;
+      const statusDiv = document.getElementById("status");
+
+      if (!urlListText) {
+        statusDiv.innerHTML = "Please paste a list of URLs.";
+        return;
+      }
+
+      statusDiv.innerHTML = "Processing URLs, please wait...";
+
+      try {
+        // Split the pasted input into an array of URLs
+        const urls = urlListText.split('\n').map(url => url.trim()).filter(url => url.length > 0);
+
+        if (urls.length === 0) {
+          throw new Error("No valid URLs found.");
+        }
+
+        // Group URLs by their parent folder
+        const groupedUrls = groupUrlsByParentFolder(urls);
+
+        // Generate Mermaid code from grouped URLs
+        const mermaidCode = generateFlowchart(groupedUrls);
+
+        // Display the Mermaid code in the preview box
+        const previewBox = document.getElementById("preview");
+        previewBox.innerHTML = `<div class="mermaid">${mermaidCode}</div>`;
+
+        // Reinitialize Mermaid to render the new content
+        mermaid.contentLoaded();
+
+        // Initialize pan and zoom functionality after Mermaid renders
+        initializeZoom();
+
+        statusDiv.innerHTML = "Mermaid code generated successfully!";
+      } catch (error) {
+        console.error("Error processing the URL list:", error);
+        statusDiv.innerHTML = `An error occurred: ${error.message}. Please check the input and try again.`;
+      }
+    }
+
+    // Function to group URLs by their parent folder
+    function groupUrlsByParentFolder(urls) {
+      const groups = {};
+
+      urls.forEach(url => {
+        const path = new URL(url).pathname; // Get path after the domain (e.g., /about, /contact)
+        const parentFolder = path.split('/')[1] || 'root'; // Use first subfolder as group, 'root' if no subfolder
+
+        // Group URLs by parent folder
+        if (!groups[parentFolder]) {
+          groups[parentFolder] = [];
+        }
+        groups[parentFolder].push(url);
+      });
+
+      return groups;
+    }
+
+    // Function to convert grouped URLs into a Mermaid flowchart
+    function generateFlowchart(groupedUrls) {
+      let code = "flowchart TD\n";
+      let nodeCount = 0;
+
+      for (const parentFolder in groupedUrls) {
+        const group = groupedUrls[parentFolder];
+
+        // Create a node for each URL in the group
+        group.forEach((url, index) => {
+          code += `  node${nodeCount}["${url}"]\n`;
+          if (index > 0) {
+            code += `  node${nodeCount - 1} --> node${nodeCount}\n`; // Connect nodes within the same group
+          }
+          nodeCount++;
+        });
+
+        // Connect groups if they share a common parent folder (e.g., /about --> /contact)
+        if (Object.keys(groupedUrls).indexOf(parentFolder) > 0) {
+          const previousGroupKey = Object.keys(groupedUrls)[Object.keys(groupedUrls).indexOf(parentFolder) - 1];
+          code += `  node${nodeCount - 1} --> node${nodeCount - group.length}\n`;
+        }
+      }
+
+      return code;
+    }
+
+    // Function to initialize zoom with svg-pan-zoom
+    function initializeZoom() {
+      const previewBox = document.getElementById("preview");
+      const svgElement = previewBox.querySelector("svg");
+
+      if (svgElement) {
+        svgPanZoom(svgElement, {
+          zoomEnabled: true,
+          controlIconsEnabled: true,
+          minZoom: 0.5,
+          maxZoom: 3,
+          fit: true,
+          center: true
+        });
+      }
+    }
+  </script>
+  <style>
+    body { font-family: 'Roboto', sans-serif; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; margin: 0; background-color: #f5f5f5; }
+    .container { background-color: #ffffff; border-radius: 12px; padding: 2rem; width: 100%; max-width: 600px; text-align: center; box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1); }
+    .input-field textarea { width: 100%; padding: 0.75rem; font-size: 1rem; border: 1px solid #dcdcdc; border-radius: 8px; outline: none; transition: border-color 0.3s ease; }
+    .button { background-color: #6200ea; color: #ffffff; padding: 0.75rem 1.5rem; font-size: 1rem; border: none; border-radius: 8px; cursor: pointer; margin-top: 1rem; }
+    .status { margin-top: 1rem; font-size: 0.9rem; }
+    .mermaid { max-width: 100%; overflow: auto; margin-top: 2rem; height: 600px; width: 100%; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>Site Structure Generator</h1>
+    <div class="input-field">
+      <textarea id="urlListText" rows="8" placeholder="Paste a list of URLs (one per line)..."></textarea>
+    </div>
+    <button class="button" onclick="generateMermaidCode()">Generate Mermaid Code</button>
+    <div id="status" class="status"></div>
+  </div>
+
+  <div id="preview" class="mermaid"></div>
+</body>
+</html>
